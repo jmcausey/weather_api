@@ -1,16 +1,23 @@
+from pathlib import Path
+
 import psycopg
 from flask import current_app, g
 from psycopg.rows import dict_row
+
+from .locations import load_locations
+
 
 def get_db():
     if "db" not in g:
         g.db = psycopg.connect(current_app.config["DATABASE_URL"], row_factory=dict_row)
     return g.db
 
+
 def close_db(exception=None):
     db = g.pop("db", None)
     if db is not None:
         db.close()
+
 
 def init_db(app):
     app.teardown_appcontext(close_db)
@@ -32,4 +39,14 @@ def init_db(app):
             last_status TEXT, last_error TEXT, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_weather_jobs_enabled_run ON weather_jobs(enabled, last_run_at)")
+        db.execute("""CREATE TABLE IF NOT EXISTS locations (
+            display_name TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            region TEXT,
+            latitude DOUBLE PRECISION NOT NULL,
+            longitude DOUBLE PRECISION NOT NULL
+        )""")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_locations_name ON locations(name)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_locations_region ON locations(region)")
+        load_locations(db, Path(app.root_path).parent / "data" / "locations.json")
         db.commit()
