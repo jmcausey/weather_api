@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from .db import get_db
+from .locations import search_locations
 from .weather import current, forecast, save_current
 
 api = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -24,6 +25,14 @@ def health():
         return jsonify({"status": "ok"})
     except Exception:
         return error("database unavailable", 503)
+
+
+@api.get("/locations")
+def locations():
+    query = request.args.get("q", "").strip()
+    limit = min(max(request.args.get("limit", 50, type=int), 1), 500)
+    rows = search_locations(query, limit)
+    return jsonify({"count": len(rows), "items": rows})
 
 
 @api.get("/weather")
