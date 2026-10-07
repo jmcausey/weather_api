@@ -48,5 +48,5 @@ def init_db(app):
         )""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_locations_name ON locations(name)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_locations_region ON locations(region)")
-        load_locations(db, Path(app.root_path).parent / "data" / "locations.json")
+        load_locations(db, Path(app.root_path).parent / "data" / "locations" / "locations.json")
         db.commit()
