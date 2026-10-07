@@ -1,27 +1,42 @@
 services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-weather}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-weather-dev-password}
+      POSTGRES_DB: ${POSTGRES_DB:-weather}
+    volumes:
+      - weather_api_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-weather} -d ${POSTGRES_DB:-weather}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build: .
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-cl}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-cl}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-weather}:${POSTGRES_PASSWORD:-weather-dev-password}@postgres:5432/${POSTGRES_DB:-weather}
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
-    command: gunicorn --bind 0.0.0.0:5002 --workers 2 app:app
+    command: gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
     ports:
-      - "${APP_PORT:-5002}:5002"
-    networks:
-      - cl_shared_data
+      - "${APP_PORT:-5000}:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   scheduler:
     build: .
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-cl}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-cl}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-weather}:${POSTGRES_PASSWORD:-weather-dev-password}@postgres:5432/${POSTGRES_DB:-weather}
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
     command: python scheduler.py
-    networks:
-      - cl_shared_data
+    depends_on:
+      postgres:
+        condition: service_healthy
 
-networks:
-  cl_shared_data:
-    external: true
-    name: cl_shared_data
+volumes:
+  weather_api_postgres_data:
