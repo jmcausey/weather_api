@@ -1,0 +1,27 @@
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cl}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-cl}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+    command: gunicorn --bind 0.0.0.0:5002 --workers 2 app:app
+    ports:
+      - "${APP_PORT:-5002}:5002"
+    networks:
+      - cl_shared_data
+
+  scheduler:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cl}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-cl}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+    command: python scheduler.py
+    networks:
+      - cl_shared_data
+
+networks:
+  cl_shared_data:
+    external: true
+    name: cl_shared_data
