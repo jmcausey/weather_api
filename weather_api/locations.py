@@ -1,9 +1,6 @@
 import json
 from pathlib import Path
 
-from psycopg import sql
-
-
 def load_locations(db, data_path):
     """Import the bundled locations JSON into PostgreSQL once, safely across workers."""
     data_path = Path(data_path)
