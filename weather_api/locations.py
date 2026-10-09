@@ -1,6 +1,61 @@
 import json
 from pathlib import Path
 
+US_STATE_ABBREVIATIONS = {
+    "alabama": "AL",
+    "alaska": "AK",
+    "arizona": "AZ",
+    "arkansas": "AR",
+    "california": "CA",
+    "colorado": "CO",
+    "connecticut": "CT",
+    "delaware": "DE",
+    "florida": "FL",
+    "georgia": "GA",
+    "hawaii": "HI",
+    "idaho": "ID",
+    "illinois": "IL",
+    "indiana": "IN",
+    "iowa": "IA",
+    "kansas": "KS",
+    "kentucky": "KY",
+    "louisiana": "LA",
+    "maine": "ME",
+    "maryland": "MD",
+    "massachusetts": "MA",
+    "michigan": "MI",
+    "minnesota": "MN",
+    "mississippi": "MS",
+    "missouri": "MO",
+    "montana": "MT",
+    "nebraska": "NE",
+    "nevada": "NV",
+    "new hampshire": "NH",
+    "new jersey": "NJ",
+    "new mexico": "NM",
+    "new york": "NY",
+    "north carolina": "NC",
+    "north dakota": "ND",
+    "ohio": "OH",
+    "oklahoma": "OK",
+    "oregon": "OR",
+    "pennsylvania": "PA",
+    "rhode island": "RI",
+    "south carolina": "SC",
+    "south dakota": "SD",
+    "tennessee": "TN",
+    "texas": "TX",
+    "utah": "UT",
+    "vermont": "VT",
+    "virginia": "VA",
+    "washington": "WA",
+    "west virginia": "WV",
+    "wisconsin": "WI",
+    "wyoming": "WY",
+    "district of columbia": "DC",
+}
+
+
 def load_locations(db, data_path):
     """Import the bundled locations JSON into PostgreSQL once, safely across workers."""
     data_path = Path(data_path)
@@ -62,11 +117,12 @@ def find_location(location):
 
 
 def search_locations(query, limit=50):
-    """Search the local dataset by display name, city/name, or region."""
+    """Search by display name, city/name, region abbreviation, or full US state name."""
     from .db import get_db
 
     query = (query or "").strip()
     pattern = f"%{query}%"
+    state_abbreviation = US_STATE_ABBREVIATIONS.get(query.casefold())
 
     return get_db().execute(
         """SELECT display_name, name, region, latitude, longitude
@@ -74,7 +130,15 @@ def search_locations(query, limit=50):
            WHERE lower(display_name) LIKE lower(%s)
               OR lower(name) LIKE lower(%s)
               OR lower(COALESCE(region, '')) LIKE lower(%s)
+              OR (%s IS NOT NULL AND upper(COALESCE(region, '')) = %s)
            ORDER BY name, region, display_name
            LIMIT %s""",
-        (pattern, pattern, pattern, limit),
+        (
+            pattern,
+            pattern,
+            pattern,
+            state_abbreviation,
+            state_abbreviation,
+            limit,
+        ),
     ).fetchall()
