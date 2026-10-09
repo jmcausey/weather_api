@@ -38,7 +38,30 @@ def init_db(app):
             enabled BOOLEAN NOT NULL DEFAULT TRUE, last_run_at TIMESTAMP,
             last_status TEXT, last_error TEXT, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        # Add the column to existing installations without deleting their jobs.
+        db.execute("ALTER TABLE weather_jobs ADD COLUMN IF NOT EXISTS job_type TEXT NOT NULL DEFAULT 'current'")
         db.execute("CREATE INDEX IF NOT EXISTS idx_weather_jobs_enabled_run ON weather_jobs(enabled, last_run_at)")
+        db.execute("""CREATE TABLE IF NOT EXISTS weather_forecasts (
+            id BIGSERIAL PRIMARY KEY,
+            location TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            snapshot_at TIMESTAMPTZ NOT NULL,
+            valid_at TIMESTAMPTZ NOT NULL,
+            temperature DOUBLE PRECISION,
+            feels_like DOUBLE PRECISION,
+            pressure INTEGER,
+            description TEXT,
+            precipitation_probability DOUBLE PRECISION,
+            precipitation_amount DOUBLE PRECISION,
+            humidity INTEGER,
+            wind_speed DOUBLE PRECISION,
+            wind_direction INTEGER,
+            clouds INTEGER,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (location, provider, snapshot_at, valid_at)
+        )""")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_weather_forecasts_location_valid ON weather_forecasts(location, valid_at)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_weather_forecasts_location_snapshot ON weather_forecasts(location, snapshot_at DESC)")
         db.execute("""CREATE TABLE IF NOT EXISTS states (
             name TEXT NOT NULL,
             abbreviation TEXT PRIMARY KEY
