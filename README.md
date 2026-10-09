@@ -48,3 +48,17 @@ Test:
 The existing PostgreSQL `chart` and `weather_jobs` tables are retained. The API initializes them if they do not exist, so existing weather history remains available to the new service.
 
 The old HTML templates, static assets, pandas, matplotlib, and UI/control-panel routes are intentionally not part of this repository.
+
+## Examples
+
+curl -i http://localhost:5000/api/v1/health
+curl 'http://localhost:5000/api/v1/locations'
+curl 'http://localhost:5000/api/v1/locations?q=Dallas&limit=10' 
+curl -s 'http://localhost:5000/api/v1/locations?q=Dallas' | python -c 'import json,sys; print(json.load(sys.stdin)["count"])'
+curl 'http://localhost:5000/api/v1/locations?q=TX&limit=20'
+curl 'http://localhost:5000/api/v1/locations?q=Seattle'
+curl 'http://localhost:5000/api/v1/locations?q=Seattle,&WA'
+curl 'http://localhost:5000/api/v1/weather?location=Seattle,%20Wa'
+curl 'http://localhost:5000/api/v1/weather?latitude=47.6062&longitude=-122.3321'
+curl 'http://localhost:5000/api/v1/forecast?latitude=47.6062&longitude=-122.3321'
+
