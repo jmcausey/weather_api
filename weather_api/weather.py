@@ -1,6 +1,6 @@
 import math
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -15,36 +15,23 @@ def _key():
 def geocode(location):
     if not location:
         return None
-
     local = find_location(location)
     if local:
-        return {
-            "name": local["name"],
-            "region": local["region"],
-            "latitude": local["latitude"],
-            "longitude": local["longitude"],
-        }
-
+        return {"name": local["name"], "region": local["region"],
+                "latitude": local["latitude"], "longitude": local["longitude"]}
     if not _key():
         return None
-
     response = requests.get(
         "https://api.openweathermap.org/geo/1.0/direct",
-        params={"q": location, "limit": 1, "appid": _key()},
-        timeout=10,
+        params={"q": location, "limit": 1, "appid": _key()}, timeout=10,
     )
     response.raise_for_status()
     items = response.json()
     if not items:
         return None
     item = items[0]
-    return {
-        "name": item.get("name") or location,
-        "country": item.get("country"),
-        "state": item.get("state"),
-        "latitude": item["lat"],
-        "longitude": item["lon"],
-    }
+    return {"name": item.get("name") or location, "country": item.get("country"),
+            "state": item.get("state"), "latitude": item["lat"], "longitude": item["lon"]}
 
 
 def current_by_coordinates(latitude, longitude):
@@ -79,19 +66,13 @@ def normalize_current(payload, requested_location=None):
         "location": requested_location or payload.get("name"),
         "observed_location": payload.get("name"),
         "country": system.get("country"),
-        "latitude": coord.get("lat"),
-        "longitude": coord.get("lon"),
-        "description": weather.get("description"),
-        "temperature": temp,
-        "feels_like": main.get("feels_like"),
-        "pressure": main.get("pressure"),
-        "humidity": humidity,
-        "visibility": payload.get("visibility"),
-        "wind_speed": wind.get("speed"),
-        "wind_direction": wind.get("deg"),
+        "latitude": coord.get("lat"), "longitude": coord.get("lon"),
+        "description": weather.get("description"), "temperature": temp,
+        "feels_like": main.get("feels_like"), "pressure": main.get("pressure"),
+        "humidity": humidity, "visibility": payload.get("visibility"),
+        "wind_speed": wind.get("speed"), "wind_direction": wind.get("deg"),
         "clouds": (payload.get("clouds") or {}).get("all"),
-        "sunrise": iso(system.get("sunrise")),
-        "sunset": iso(system.get("sunset")),
+        "sunrise": iso(system.get("sunrise")), "sunset": iso(system.get("sunset")),
         "dew_point": dew,
     }
 
@@ -112,7 +93,6 @@ def forecast(location=None, latitude=None, longitude=None):
             raise LookupError(f"Location not found: {location}")
         latitude, longitude = resolved["latitude"], resolved["longitude"]
         location = location or resolved["name"]
-
     if not _key():
         raise RuntimeError("OPENWEATHER_API_KEY is not configured")
 
@@ -125,35 +105,34 @@ def forecast(location=None, latitude=None, longitude=None):
     payload = response.json()
     city = payload.get("city") or {}
     points = []
+    local_timezone = timezone(timedelta(seconds=city.get("timezone", 0)))
 
     for item in payload.get("list", []):
         weather = (item.get("weather") or [{}])[0]
         main = item.get("main") or {}
         wind = item.get("wind") or {}
-        local_dt = datetime.fromtimestamp(
-            item["dt"] + city.get("timezone", 0), tz=timezone.utc
-        )
+        valid_at = datetime.fromtimestamp(item["dt"], tz=timezone.utc)
+        rain = (item.get("rain") or {}).get("3h")
+        snow = (item.get("snow") or {}).get("3h")
+        precipitation_amount = ((rain or 0) + (snow or 0)) if rain is not None or snow is not None else None
         points.append({
-            "time": local_dt.isoformat(),
+            "time": valid_at.astimezone(local_timezone).isoformat(),
+            "valid_at": valid_at.isoformat(),
             "temperature": main.get("temp"),
             "feels_like": main.get("feels_like"),
+            "pressure": main.get("pressure"),
             "description": weather.get("description"),
             "icon": weather.get("icon"),
             "precipitation_probability": round((item.get("pop") or 0) * 100),
+            "precipitation_amount": precipitation_amount,
             "humidity": main.get("humidity"),
             "wind_speed": wind.get("speed"),
             "wind_direction": wind.get("deg"),
             "clouds": (item.get("clouds") or {}).get("all"),
         })
-
-    return {
-        "location": location or city.get("name"),
-        "city": city.get("name"),
-        "country": city.get("country"),
-        "latitude": latitude,
-        "longitude": longitude,
-        "points": points,
-    }
+    return {"provider": "openweathermap", "location": location or city.get("name"),
+            "city": city.get("name"), "country": city.get("country"),
+            "latitude": latitude, "longitude": longitude, "points": points}
 
 
 def save_current(payload):
@@ -165,21 +144,43 @@ def save_current(payload):
                VALUES (%(location)s, %(geolocation)s, %(description)s, %(temperature)s, %(pressure)s,
                        %(feelslike)s, %(humidity)s, %(visibility)s, %(windspeed)s, %(winddirection)s,
                        %(clouds)s, %(sunrise)s, %(sunset)s, %(dew_point)s)""",
-            {
-                "location": payload["location"],
-                "geolocation": f'{payload["latitude"]},{payload["longitude"]}',
-                "description": payload["description"],
-                "temperature": payload["temperature"],
-                "pressure": payload["pressure"],
-                "feelslike": payload["feels_like"],
-                "humidity": payload["humidity"],
-                "visibility": payload["visibility"],
-                "windspeed": payload["wind_speed"],
-                "winddirection": payload["wind_direction"],
-                "clouds": payload["clouds"],
-                "sunrise": payload["sunrise"],
-                "sunset": payload["sunset"],
-                "dew_point": payload["dew_point"],
-            },
+            {"location": payload["location"],
+             "geolocation": f'{payload["latitude"]},{payload["longitude"]}',
+             "description": payload["description"], "temperature": payload["temperature"],
+             "pressure": payload["pressure"], "feelslike": payload["feels_like"],
+             "humidity": payload["humidity"], "visibility": payload["visibility"],
+             "windspeed": payload["wind_speed"], "winddirection": payload["wind_direction"],
+             "clouds": payload["clouds"], "sunrise": payload["sunrise"],
+             "sunset": payload["sunset"], "dew_point": payload["dew_point"]},
         )
         db.commit()
+
+
+def save_forecast(payload):
+    """Persist each forecast period as part of a timestamped forecast snapshot."""
+    snapshot_at = datetime.now(timezone.utc)
+    points = payload.get("points", [])
+    if not points:
+        raise ValueError("forecast provider returned no forecast points")
+    rows = [
+        (payload["location"], payload.get("provider", "openweathermap"), snapshot_at,
+         point["valid_at"], point.get("temperature"), point.get("feels_like"),
+         point.get("pressure"), point.get("description"),
+         point.get("precipitation_probability"), point.get("precipitation_amount"),
+         point.get("humidity"), point.get("wind_speed"), point.get("wind_direction"),
+         point.get("clouds"))
+        for point in points
+    ]
+    with get_db() as db:
+        with db.cursor() as cur:
+            cur.executemany(
+                """INSERT INTO weather_forecasts
+                   (location, provider, snapshot_at, valid_at, temperature, feels_like,
+                    pressure, description, precipitation_probability, precipitation_amount,
+                    humidity, wind_speed, wind_direction, clouds)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (location, provider, snapshot_at, valid_at) DO NOTHING""",
+                rows,
+            )
+        db.commit()
+    return len(rows)
