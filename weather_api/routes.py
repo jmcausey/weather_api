@@ -86,13 +86,30 @@ def history():
     query = """SELECT id, created_at, location, geolocation, description, temperature,
                       pressure, feelslike AS feels_like, humidity, visibility,
                       windspeed AS wind_speed, winddirection AS wind_direction,
-                      clouds, sunrise, sunset, dew_point
-               FROM chart"""
+                      clouds, sunrise, sunset, dew_point FROM chart"""
     params = []
     if location:
         query += " WHERE location = %s"
         params.append(location)
     query += " ORDER BY created_at DESC LIMIT %s"
+    params.append(limit)
+    rows = get_db().execute(query, params).fetchall()
+    return jsonify({"count": len(rows), "items": rows})
+
+
+@api.get("/forecasts")
+def stored_forecasts():
+    location = request.args.get("location", "").strip()
+    limit = min(max(request.args.get("limit", 100, type=int), 1), 1000)
+    query = """SELECT id, location, provider, snapshot_at, valid_at, temperature,
+                      feels_like, pressure, description, precipitation_probability,
+                      precipitation_amount, humidity, wind_speed, wind_direction, clouds
+               FROM weather_forecasts"""
+    params = []
+    if location:
+        query += " WHERE location = %s"
+        params.append(location)
+    query += " ORDER BY snapshot_at DESC, valid_at ASC LIMIT %s"
     params.append(limit)
     rows = get_db().execute(query, params).fetchall()
     return jsonify({"count": len(rows), "items": rows})
@@ -111,17 +128,20 @@ def create_job():
     missing = [field for field in required if body.get(field) is None]
     if missing:
         return error("missing fields: " + ", ".join(missing))
+    job_type = str(body.get("job_type", "current")).strip().lower()
+    if job_type not in ("current", "forecast"):
+        return error("job_type must be 'current' or 'forecast'")
     if body["interval_minutes"] not in (15, 60, 240, 1440):
         return error("interval_minutes must be 15, 60, 240, or 1440")
     try:
         with get_db() as db:
             row = db.execute(
                 """INSERT INTO weather_jobs
-                   (name, location, latitude, longitude, interval_minutes, enabled)
-                   VALUES (%s,%s,%s,%s,%s,%s) RETURNING *""",
+                   (name, location, latitude, longitude, interval_minutes, enabled, job_type)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
                 (body["name"], body["location"], float(body["latitude"]),
                  float(body["longitude"]), body["interval_minutes"],
-                 bool(body.get("enabled", True))),
+                 bool(body.get("enabled", True)), job_type),
             ).fetchone()
             db.commit()
         return jsonify(row), 201
