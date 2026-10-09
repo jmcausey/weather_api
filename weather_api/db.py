@@ -4,7 +4,7 @@ import psycopg
 from flask import current_app, g
 from psycopg.rows import dict_row
 
-from .locations import load_locations
+from .locations import load_locations, load_states
 
 
 def get_db():
@@ -39,6 +39,10 @@ def init_db(app):
             last_status TEXT, last_error TEXT, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_weather_jobs_enabled_run ON weather_jobs(enabled, last_run_at)")
+        db.execute("""CREATE TABLE IF NOT EXISTS states (
+            name TEXT NOT NULL,
+            abbreviation TEXT PRIMARY KEY
+        )""")
         db.execute("""CREATE TABLE IF NOT EXISTS locations (
             display_name TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -48,5 +52,7 @@ def init_db(app):
         )""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_locations_name ON locations(name)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_locations_region ON locations(region)")
-        load_locations(db, Path(app.root_path).parent / "data" / "locations" / "locations.json")
+        data_dir = Path(app.root_path).parent / "data" / "locations"
+        load_states(db, data_dir / "states.json")
+        load_locations(db, data_dir / "locations.json")
         db.commit()
