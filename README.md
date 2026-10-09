@@ -7,10 +7,10 @@ API-only weather service migrated from jmcausey/weather.
 - GET /api/v1/health
 - GET /api/v1/locations?q=Dallas&limit=20
 - GET /api/v1/weather?location=Athens,TX
-- GET /api/v1/weather?latitude=32.2049&longitude=-95.8555
 - GET /api/v1/forecast?location=Athens,TX
 - POST /api/v1/weather/collect
 - GET /api/v1/history?location=Athens,TX&limit=50
+- GET /api/v1/forecasts?location=Malakoff,%20TX&limit=100
 - GET /api/v1/jobs
 - POST /api/v1/jobs
 - DELETE /api/v1/jobs/{id}
@@ -18,47 +18,41 @@ API-only weather service migrated from jmcausey/weather.
 
 ## Locations
 
-The repository includes `data/locations.json`, containing 10,573 city/location entries as `"Display Name": [latitude, longitude]`.
+The repository includes `data/locations/locations.json`, containing location names and coordinates, and `data/locations/states.json` for US state-name searching. PostgreSQL loads these datasets on startup.
 
-On application startup, PostgreSQL creates the `locations` table and imports the bundled dataset if the table is empty. The import is protected by a PostgreSQL advisory lock so multiple Gunicorn workers cannot import the dataset concurrently.
+## Scheduled collection
 
-The location API searches the imported dataset:
+The scheduler container polls enabled `weather_jobs` every 30 seconds and runs jobs when their interval is due. A job can collect either `current` weather or `forecast` snapshots. Current conditions are stored in the existing `chart` table. Forecast collection stores every forecast period returned by OpenWeatherMap in `weather_forecasts`, with both the retrieval time (`snapshot_at`) and forecast-valid time (`valid_at`).
 
-    curl "http://localhost:5002/api/v1/locations?q=Dallas&limit=20"
+Forecast snapshots are retained instead of overwritten so later you can compare what a forecast predicted with what actually happened. Current conditions from a weather API are not necessarily quality-controlled weather-station observations.
 
-Weather and forecast requests that provide `location=...` first resolve against this local dataset. If there is no local match, the service falls back to OpenWeather geocoding when `OPENWEATHER_API_KEY` is configured. Requests that provide latitude/longitude continue to use those coordinates directly.
+Create an hourly current-weather job for Malakoff, TX:
+
+    curl -sS -X POST http://localhost:5000/api/v1/jobs \
+      -H 'Content-Type: application/json' \
+      -d '{"name":"Malakoff hourly current weather","location":"Malakoff, TX","latitude":32.168687,"longitude":-96.012214,"interval_minutes":60,"job_type":"current","enabled":true}'
+
+Create a forecast job that refreshes every four hours:
+
+    curl -sS -X POST http://localhost:5000/api/v1/jobs \
+      -H 'Content-Type: application/json' \
+      -d '{"name":"Malakoff forecast every 4 hours","location":"Malakoff, TX","latitude":32.168687,"longitude":-96.012214,"interval_minutes":240,"job_type":"forecast","enabled":true}'
+
+New jobs are eligible on the next scheduler poll. Inspect jobs and their last status with:
+
+    curl -sS http://localhost:5000/api/v1/jobs
+
+Inspect stored actual-weather samples and forecast snapshots with:
+
+    curl -sS 'http://localhost:5000/api/v1/history?location=Malakoff,%20TX&limit=10'
+    curl -sS 'http://localhost:5000/api/v1/forecasts?location=Malakoff,%20TX&limit=20'
+
+Use `last_status` and `last_error` on each job to troubleshoot collection. Allowed intervals are 15, 60, 240, and 1440 minutes.
 
 ## Docker
-
-Designed to share the PostgreSQL server and `cl_shared_data` Docker network used by jmcausey/cl.
 
     cp .env.example .env
     # set OPENWEATHER_API_KEY and matching PostgreSQL credentials
     docker compose up -d --build
 
-Test:
-
-    curl http://localhost:5002/api/v1/health
-    curl "http://localhost:5002/api/v1/locations?q=Athens&limit=10"
-    curl "http://localhost:5002/api/v1/weather?location=Dallas,%20TX"
-    curl "http://localhost:5002/api/v1/history?location=Dallas,%20TX&limit=10"
-
-## Data compatibility
-
-The existing PostgreSQL `chart` and `weather_jobs` tables are retained. The API initializes them if they do not exist, so existing weather history remains available to the new service.
-
-The old HTML templates, static assets, pandas, matplotlib, and UI/control-panel routes are intentionally not part of this repository.
-
-## Examples
-
-curl -i http://localhost:5000/api/v1/health
-curl 'http://localhost:5000/api/v1/locations'
-curl 'http://localhost:5000/api/v1/locations?q=Dallas&limit=10' 
-curl -s 'http://localhost:5000/api/v1/locations?q=Dallas' | python -c 'import json,sys; print(json.load(sys.stdin)["count"])'
-curl 'http://localhost:5000/api/v1/locations?q=TX&limit=20'
-curl 'http://localhost:5000/api/v1/locations?q=Seattle'
-curl 'http://localhost:5000/api/v1/locations?q=Seattle,&WA'
-curl 'http://localhost:5000/api/v1/weather?location=Seattle,%20Wa'
-curl 'http://localhost:5000/api/v1/weather?latitude=47.6062&longitude=-122.3321'
-curl 'http://localhost:5000/api/v1/forecast?latitude=47.6062&longitude=-122.3321'
-
+The existing PostgreSQL `chart` and `weather_jobs` tables are retained. Startup adds the `job_type` column to existing installations and creates `weather_forecasts` without dropping data.
