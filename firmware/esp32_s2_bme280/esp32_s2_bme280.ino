@@ -6,8 +6,9 @@
  *   - Adafruit Unified Sensor
  *
  * Configure Wi-Fi and API settings below before uploading.
- * For production, use an HTTPS endpoint with certificate validation.
- * Do not expose a plain-HTTP API or device token to the public internet.
+ * This starter sketch uses plain HTTP for a trusted LAN only. Do not expose
+ * the endpoint/device key to the public internet. HTTPS certificate validation
+ * requires a WiFiClientSecure configuration and is not implemented here.
  */
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -19,15 +20,14 @@
 const char* WIFI_SSID = "CHANGE_ME";
 const char* WIFI_PASSWORD = "CHANGE_ME";
 
-// Example: http://192.168.1.20:5000/api/v1/sensors/observations
-// Use HTTPS with certificate validation when the API is remote.
-const char* API_URL = "http://192.168.1.20:5000/api/v1/sensors/observations";
+// Use your server's LAN IP and actual published APP_PORT, not localhost.
+const char* API_URL = "http://192.168.1.20:5002/api/v1/sensors/observations";
 const char* SENSOR_API_KEY = "CHANGE_ME_TO_A_LONG_RANDOM_SECRET";
 const char* STATION_ID = "home-weather-01";
 
 const unsigned long SAMPLE_INTERVAL_MS = 60000UL;
-const int I2C_SDA_PIN =  SDA; // Change if your wiring uses different pins.
-const int I2C_SCL_PIN =  SCL;
+const int I2C_SDA_PIN = SDA;
+const int I2C_SCL_PIN = SCL;
 
 Adafruit_BME280 bme;
 unsigned long lastSendMs = 0;
@@ -35,9 +35,7 @@ bool bmeReady = false;
 
 String utcTimestamp() {
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 1000)) {
-    return ""; // Do not submit a fabricated timestamp if NTP is unavailable.
-  }
+  if (!getLocalTime(&timeinfo, 1000)) return "";
   char buffer[25];
   strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
   return String(buffer);
@@ -73,8 +71,8 @@ bool postObservation() {
     return false;
   }
 
-  // Future measurements are optional. Add wind_speed_mps, wind_direction_deg,
-  // rainfall_mm, and/or rainfall_total_mm when those sensors are installed.
+  // Add optional wind_speed_mps, wind_direction_deg, rainfall_mm, and/or
+  // rainfall_total_mm when those sensors are installed.
   String body = "{";
   body += "\"station_id\":\"" + String(STATION_ID) + "\",";
   body += "\"observed_at\":\"" + observedAt + "\",";
@@ -107,12 +105,9 @@ void setup() {
 
   bmeReady = bme.begin(0x77, &Wire);
   if (!bmeReady) bmeReady = bme.begin(0x76, &Wire);
-  if (!bmeReady) {
-    Serial.println("BME280 not found at I2C addresses 0x77 or 0x76.");
-  }
+  if (!bmeReady) Serial.println("BME280 not found at I2C addresses 0x77 or 0x76.");
 
   connectWiFi();
-  // UTC clock from NTP. Dallas, Texas uses Central time, but storage is UTC.
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
 }
 
@@ -120,11 +115,8 @@ void loop() {
   unsigned long now = millis();
   if (now - lastSendMs >= SAMPLE_INTERVAL_MS) {
     lastSendMs = now;
-    if (postObservation()) {
-      Serial.println("Observation accepted.");
-    } else {
-      Serial.println("Observation not sent; next scheduled attempt will retry.");
-    }
+    if (postObservation()) Serial.println("Observation accepted.");
+    else Serial.println("Observation not sent; next scheduled attempt will retry.");
   }
   delay(50);
 }
