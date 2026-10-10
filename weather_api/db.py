@@ -6,10 +6,12 @@ from psycopg.rows import dict_row
 
 from .locations import load_locations, load_states
 
-
 def get_db():
-    if "db" not in g:
-        g.db = psycopg.connect(current_app.config["DATABASE_URL"], row_factory=dict_row)
+    if "db" not in g or g.db.closed:
+        g.db = psycopg.connect(
+            current_app.config["DATABASE_URL"],
+            row_factory=dict_row,
+        )
     return g.db
 
 
