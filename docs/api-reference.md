@@ -222,3 +222,55 @@ curl -sS -X DELETE http://localhost:5000/api/v1/jobs/1
 ```
 
 Successful response: `{"deleted": 1}`. Unknown IDs return HTTP 404.
+
+
+## Local sensor station ingestion
+
+Sensor ingestion is separate from the OpenWeatherMap endpoints and requires the `X-Sensor-API-Key` header. Configure `SENSOR_INGEST_API_KEY` in the private `.env`; requests are rejected if the key is absent or invalid. Keep the API on a trusted LAN or use HTTPS with certificate validation when sending data over an untrusted network.
+
+### `POST /api/v1/sensors/observations`
+
+Accepts one observation from a physical station. `station_id` and a timezone-aware ISO 8601 `observed_at` timestamp are required. At least one measurement is required; unused future sensor fields can be omitted or set to `null`.
+
+```json
+{
+  "station_id": "home-weather-01",
+  "observed_at": "2026-10-10T18:30:00Z",
+  "temperature_c": 23.7,
+  "humidity_pct": 54.2,
+  "pressure_hpa": 1013.4,
+  "wind_speed_mps": null,
+  "wind_direction_deg": null,
+  "rainfall_mm": null,
+  "rainfall_total_mm": null
+}
+```
+
+Send it with:
+
+```bash
+curl -sS -X POST http://localhost:5000/api/v1/sensors/observations \\
+  -H 'Content-Type: application/json' \\
+  -H 'X-Sensor-API-Key: YOUR_SENSOR_INGEST_API_KEY' \\
+  -d '{"station_id":"home-weather-01","observed_at":"2026-10-10T18:30:00Z","temperature_c":23.7,"humidity_pct":54.2,"pressure_hpa":1013.4}'
+```
+
+The sample values are illustrative. Successful ingestion returns HTTP 201 and the stored observation. Temperature is Celsius, pressure hPa, wind speed m/s, wind direction degrees clockwise from north, and rainfall millimeters.
+
+### `GET /api/v1/sensors/{station_id}/latest`
+
+Returns the latest observation for a station:
+
+```bash
+curl -sS http://localhost:5000/api/v1/sensors/home-weather-01/latest
+```
+
+### `GET /api/v1/sensors/{station_id}/history?limit=50`
+
+Returns recent observations, with `limit` bounded to 1–1000:
+
+```bash
+curl -sS 'http://localhost:5000/api/v1/sensors/home-weather-01/history?limit=100'
+```
+
+For the Arduino ESP32-S2 Feather + BME280 firmware and setup steps, see [Sensor Station Guide](sensor-station.md).
