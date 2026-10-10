@@ -5,12 +5,12 @@ API-only weather service migrated from jmcausey/weather.
 ## Endpoints
 
 - GET /api/v1/health
-- GET /api/v1/locations?q=Dallas&limit=20
-- GET /api/v1/weather?location=Athens,TX
-- GET /api/v1/forecast?location=Athens,TX
+- GET /api/v1/locations?q=Seattle&limit=20
+- GET /api/v1/weather?location=Seattle,WA
+- GET /api/v1/forecast?location=Seattle,WA
 - POST /api/v1/weather/collect
-- GET /api/v1/history?location=Athens,TX&limit=50
-- GET /api/v1/forecasts?location=Malakoff,%20TX&limit=100
+- GET /api/v1/history?location=Seattle,WA&limit=50
+- GET /api/v1/forecasts?location=Seattle,%20WA&limit=100
 - GET /api/v1/jobs
 - POST /api/v1/jobs
 - DELETE /api/v1/jobs/{id}
@@ -26,17 +26,19 @@ The scheduler container polls enabled `weather_jobs` every 30 seconds and runs j
 
 Forecast snapshots are retained instead of overwritten so later you can compare what a forecast predicted with what actually happened. Current conditions from a weather API are not necessarily quality-controlled weather-station observations.
 
-Create an hourly current-weather job for Malakoff, TX:
+The examples below use Seattle, WA (latitude `47.6062`, longitude `-122.3321`).
+
+Create an hourly current-weather job for Seattle, WA:
 
     curl -sS -X POST http://localhost:5000/api/v1/jobs \
       -H 'Content-Type: application/json' \
-      -d '{"name":"Malakoff hourly current weather","location":"Malakoff, TX","latitude":32.168687,"longitude":-96.012214,"interval_minutes":60,"job_type":"current","enabled":true}'
+      -d '{"name":"Seattle hourly current weather","location":"Seattle, WA","latitude":47.6062,"longitude":-122.3321,"interval_minutes":60,"job_type":"current","enabled":true}'
 
 Create a forecast job that refreshes every four hours:
 
     curl -sS -X POST http://localhost:5000/api/v1/jobs \
       -H 'Content-Type: application/json' \
-      -d '{"name":"Malakoff forecast every 4 hours","location":"Malakoff, TX","latitude":32.168687,"longitude":-96.012214,"interval_minutes":240,"job_type":"forecast","enabled":true}'
+      -d '{"name":"Seattle forecast every 4 hours","location":"Seattle, WA","latitude":47.6062,"longitude":-122.3321,"interval_minutes":240,"job_type":"forecast","enabled":true}'
 
 New jobs are eligible on the next scheduler poll. Inspect jobs and their last status with:
 
@@ -44,8 +46,8 @@ New jobs are eligible on the next scheduler poll. Inspect jobs and their last st
 
 Inspect stored actual-weather samples and forecast snapshots with:
 
-    curl -sS 'http://localhost:5000/api/v1/history?location=Malakoff,%20TX&limit=10'
-    curl -sS 'http://localhost:5000/api/v1/forecasts?location=Malakoff,%20TX&limit=20'
+    curl -sS 'http://localhost:5000/api/v1/history?location=Seattle%2C%20WA&limit=10'
+    curl -sS 'http://localhost:5000/api/v1/forecasts?location=Seattle%2C%20WA&limit=20'
 
 Use `last_status` and `last_error` on each job to troubleshoot collection. Allowed intervals are 15, 60, 240, and 1440 minutes.
 
