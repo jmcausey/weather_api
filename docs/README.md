@@ -1,9 +1,10 @@
 # Weather API Documentation
 
-This directory documents the `weather_api` application, its HTTP API, database schema, background scheduler, and deployment configuration.
+This directory documents the `weather_api` application, its HTTP API, database schema, background scheduler, installation, and deployment.
 
 ## Guides
 
+- [Interactive installer](installer.md) — guided OpenWeatherMap setup, environment prompts, and Docker startup.
 - [Architecture and code map](architecture.md) — application startup, modules, and request/data flow.
 - [HTTP API reference](api-reference.md) — endpoints, parameters, request bodies, and examples.
 - [Database schema](database.md) — tables, columns, indexes, and retention behavior.
@@ -18,5 +19,6 @@ Bundled location and state datasets are stored under `data/locations/` and impor
 ## Quick links
 
 - [Project README](../README.md)
+- [Installer script](../install.sh)
 - [Source package](../weather_api/)
 - [Docker Compose configuration](../docker-compose.yml)
