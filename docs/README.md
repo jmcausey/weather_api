@@ -22,3 +22,7 @@ Bundled location and state datasets are stored under `data/locations/` and impor
 - [Installer script](../install.sh)
 - [Source package](../weather_api/)
 - [Docker Compose configuration](../docker-compose.yml)
+
+
+- [ESP32 Sensor Station](sensor-station.md) — Adafruit ESP32-S2 Feather + BME280 setup, authenticated ingestion, and future wind/rain expansion.
+- [Sensor observation payload](sensor-observation-schema.json) — example extensible JSON observation.

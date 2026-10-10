@@ -80,3 +80,14 @@ If you prefer not to use the installer:
     docker compose up -d --build
 
 The existing PostgreSQL `chart` and `weather_jobs` tables are retained. Startup adds the `job_type` column to existing installations and creates `weather_forecasts` without dropping data.
+
+
+## Local sensor station
+
+The API can accept locally measured observations from an ESP32-based station independently of OpenWeatherMap. Sensor readings are stored in dedicated PostgreSQL tables and do not alter existing OpenWeatherMap current-weather or forecast behavior.
+
+- [Sensor station setup and ESP32-S2 Feather firmware](docs/sensor-station.md)
+- [Sensor API reference](docs/api-reference.md#local-sensor-station-ingestion)
+- [Example observation schema](docs/sensor-observation-schema.json)
+
+Set a long random `SENSOR_INGEST_API_KEY` in `.env` before sending readings. The firmware currently supports the BME280 measurements (temperature, humidity, pressure); the API schema also accommodates future wind speed, wind direction, and rainfall readings.

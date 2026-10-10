@@ -1,0 +1,11 @@
+{
+  "station_id": "home-weather-01",
+  "observed_at": "2026-10-10T18:30:00Z",
+  "temperature_c": 23.7,
+  "humidity_pct": 54.2,
+  "pressure_hpa": 1013.4,
+  "wind_speed_mps": null,
+  "wind_direction_deg": null,
+  "rainfall_mm": null,
+  "rainfall_total_mm": null
+}
