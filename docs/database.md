@@ -110,3 +110,37 @@ The same `snapshot_at` is assigned to all periods from one forecast collection. 
 - The bundled locations catalog is loaded only when the `locations` table is empty.
 - Deleting a `weather_jobs` row removes the schedule definition only; it does not delete weather history or forecast rows.
 - No automated retention/purge process is currently defined in the application code.
+
+
+## `sensor_stations`
+
+Registry of stations that have sent at least one accepted observation. The first accepted observation creates the station automatically; later observations update `last_seen_at`.
+
+| Column | Type | Description |
+|---|---|---|
+| `station_id` | `TEXT PRIMARY KEY` | Device/station identifier supplied in each observation. |
+| `created_at` | `TIMESTAMPTZ` | First registry insert time. |
+| `last_seen_at` | `TIMESTAMPTZ` | Most recent accepted observation arrival time. |
+
+## `sensor_observations`
+
+Append-only, timestamped local station readings. Sensor-specific values are nullable so station hardware can expand gradually.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | `BIGSERIAL PRIMARY KEY` | Observation ID. |
+| `station_id` | `TEXT NOT NULL` | Foreign key to `sensor_stations`. |
+| `observed_at` | `TIMESTAMPTZ NOT NULL` | Device measurement time, normalized to UTC. |
+| `received_at` | `TIMESTAMPTZ NOT NULL` | Server receive time. |
+| `temperature_c` | `DOUBLE PRECISION` | Temperature in °C. |
+| `humidity_pct` | `DOUBLE PRECISION` | Relative humidity, percent. |
+| `pressure_hpa` | `DOUBLE PRECISION` | Barometric pressure, hPa. |
+| `wind_speed_mps` | `DOUBLE PRECISION` | Wind speed, meters per second. |
+| `wind_direction_deg` | `DOUBLE PRECISION` | Wind direction in degrees clockwise from north. |
+| `rainfall_mm` | `DOUBLE PRECISION` | Rainfall during the reporting interval, mm. |
+| `rainfall_total_mm` | `DOUBLE PRECISION` | Optional cumulative rainfall counter, mm. |
+| `created_at` | `TIMESTAMPTZ` | Database row creation time. |
+
+Index: `idx_sensor_observations_station_time` on `(station_id, observed_at DESC)`.
+
+These station readings are stored separately from the legacy OpenWeatherMap `chart` table and `weather_forecasts`. This prevents unit and source ambiguity and preserves the original API behavior.
