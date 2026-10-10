@@ -21,15 +21,14 @@ Do not infer wind or rain as zero when those sensors are absent; omit the field 
 
 ## Configure the API
 
-1. Set `SENSOR_INGEST_API_KEY` in the private `.env` to a long random secret.
-2. Ensure the API and scheduler containers receive this environment variable (Compose does this for both).
-3. Rebuild/restart the API after changing the environment:
+1. Generate a long random secret, for example with `openssl rand -hex 32`.
+2. Set it as `SENSOR_INGEST_API_KEY` in the private `.env`.
+3. Keep the API key out of Git and never commit your real `.env`.
+4. Rebuild/restart the API after changing the environment:
 
    ```bash
    docker compose up -d --build
    ```
-
-4. Keep the API key out of Git and never commit your real `.env`.
 
 The first implementation uses one shared ingestion key for the station endpoint. Treat it as a device credential: store it privately in firmware configuration and rotate it if the device is lost or compromised. A later iteration can support per-station credentials.
 
@@ -44,7 +43,9 @@ Install these libraries using Library Manager:
 
 Select the Adafruit ESP32-S2 Feather board. Edit `WIFI_SSID`, `WIFI_PASSWORD`, `API_URL`, and `SENSOR_API_KEY` before upload. The example tries I²C addresses 0x77 and 0x76. Check your breakout's wiring and I²C address if initialization fails.
 
-Set `API_URL` to the API host reachable from the ESP32. Do not use `localhost`: on the ESP32, that means the ESP32 itself. For a server on your home network, use its LAN address, for example `http://192.168.1.20:5000/api/v1/sensors/observations`. Plain HTTP is suitable only for a trusted isolated LAN; use HTTPS with certificate validation for remote/public access. Do not expose this endpoint to the internet over plain HTTP.
+Set `API_URL` to the API host reachable from the ESP32. Do not use `localhost`: on the ESP32, that means the ESP32 itself. For a server on your home network, use its LAN address and published `APP_PORT`, for example `http://192.168.1.20:5002/api/v1/sensors/observations`.
+
+**Security limitation:** the included starter sketch uses plain HTTP. Use it only on a trusted, isolated LAN. Do not port-forward this endpoint or send the device key over the public internet. HTTPS with certificate validation requires additional `WiFiClientSecure` code and is not implemented in this starter sketch.
 
 The firmware sends a reading once per minute and uses NTP to create UTC timestamps. If Wi-Fi or the API is unavailable, it logs the failure and retries on the next interval; this starter firmware does not persist a queue across power loss.
 
@@ -53,7 +54,7 @@ The firmware sends a reading once per minute and uses NTP to create UTC timestam
 Use the same API key configured in `.env`:
 
 ```bash
-curl -sS -X POST http://localhost:5000/api/v1/sensors/observations \
+curl -sS -X POST http://localhost:5002/api/v1/sensors/observations \
   -H 'Content-Type: application/json' \
   -H 'X-Sensor-API-Key: YOUR_SENSOR_INGEST_API_KEY' \
   -d '{
@@ -68,18 +69,18 @@ curl -sS -X POST http://localhost:5000/api/v1/sensors/observations \
 Check the latest sample and recent history:
 
 ```bash
-curl -sS http://localhost:5000/api/v1/sensors/home-weather-01/latest
-curl -sS 'http://localhost:5000/api/v1/sensors/home-weather-01/history?limit=20'
+curl -sS http://localhost:5002/api/v1/sensors/home-weather-01/latest
+curl -sS 'http://localhost:5002/api/v1/sensors/home-weather-01/history?limit=20'
 ```
 
-The sample values above are illustrative, not real readings.
+The sample values above are illustrative, not real readings. Replace port 5002 with the `APP_PORT` value configured in your `.env`.
 
 ## Future sensor expansion
 
 The API payload and database already reserve optional fields for the following additions:
 
 - Wind speed: use `wind_speed_mps` and convert pulses to m/s in the microcontroller firmware.
-- Wind direction: use `wind_direction_deg` in degrees clockwise from true/north reference as defined by the sensor installation. Apply a calibration offset if required.
+- Wind direction: use `wind_direction_deg` in degrees clockwise from north as defined by the sensor installation. Apply a calibration offset if required.
 - Rain gauge: send `rainfall_mm` for each reporting interval, and optionally `rainfall_total_mm` for the station's cumulative counter.
 
 For a tipping-bucket gauge, count switch transitions with a debounced interrupt or pulse counter and convert each tip using the gauge manufacturer's mm-per-tip calibration. Preserve the interval amount separately from the cumulative total. On reboot, the cumulative total may reset unless persisted; consumers should use interval rainfall for straightforward aggregation.
