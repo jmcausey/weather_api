@@ -20,6 +20,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-weather}:${POSTGRES_PASSWORD:-weather-dev-password}@postgres:5432/${POSTGRES_DB:-weather}
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+      SENSOR_INGEST_API_KEY: ${SENSOR_INGEST_API_KEY:-}
     command: gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
     ports:
       - "${APP_PORT:-5000}:5000"
