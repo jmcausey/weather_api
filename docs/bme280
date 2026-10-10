@@ -1,0 +1,66 @@
+                  weather_api
+                       |
+          +------------+------------+
+          |                         |
+          v                         v
+    OpenWeatherMap             Arduino sensor
+          |                         |
+          |                    BME sensor
+          |                         |
+          |                      Arduino
+          |                         |
+          |                 USB serial or Wi-Fi
+          |                         |
+          v                         v
+   OpenWeatherMap             Sensor ingestion
+     collector                    endpoint
+          |                         |
+          +------------+------------+
+                       |
+                       v
+                   PostgreSQL
+                       |
+            +----------+----------+
+            |                     |
+            v                     v
+      Current weather        Weather history
+            |
+            v
+       Flask REST API
+            |
+            v
+         LOCALS ONLY
+
+┌──────────────────────────────────┐
+│ Adafruit ESP32-S2 Feather        │
+│                                  │
+│ BME280                            │
+│  • Temperature                   │
+│  • Relative humidity             │
+│  • Barometric pressure           │
+│                                  │
+│ Future sensor inputs             │
+│  • Wind speed                    │
+│  • Wind direction                │
+│  • Rainfall                      │
+└────────────────┬─────────────────┘
+                 │ Wi-Fi / HTTPS
+                 ▼
+┌──────────────────────────────────┐
+│ Existing weather_api             │
+│                                  │
+│ Sensor ingestion API             │
+│ Validation and authentication    │
+│ PostgreSQL storage               │
+│ Sensor history and latest values │
+└────────────────┬─────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────┐
+│ LOCALS ONLY / other consumers     │
+│                                  │
+│ Local sensor observations        │
+│ OpenWeatherMap observations       │
+│ Historical charts and comparisons│
+└──────────────────────────────────┘
+
