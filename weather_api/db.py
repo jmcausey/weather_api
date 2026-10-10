@@ -38,7 +38,6 @@ def init_db(app):
             enabled BOOLEAN NOT NULL DEFAULT TRUE, last_run_at TIMESTAMP,
             last_status TEXT, last_error TEXT, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
-        # Add the column to existing installations without deleting their jobs.
         db.execute("ALTER TABLE weather_jobs ADD COLUMN IF NOT EXISTS job_type TEXT NOT NULL DEFAULT 'current'")
         db.execute("CREATE INDEX IF NOT EXISTS idx_weather_jobs_enabled_run ON weather_jobs(enabled, last_run_at)")
         db.execute("""CREATE TABLE IF NOT EXISTS weather_forecasts (
@@ -62,6 +61,26 @@ def init_db(app):
         )""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_weather_forecasts_location_valid ON weather_forecasts(location, valid_at)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_weather_forecasts_location_snapshot ON weather_forecasts(location, snapshot_at DESC)")
+        db.execute("""CREATE TABLE IF NOT EXISTS sensor_stations (
+            station_id TEXT PRIMARY KEY,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_seen_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS sensor_observations (
+            id BIGSERIAL PRIMARY KEY,
+            station_id TEXT NOT NULL REFERENCES sensor_stations(station_id),
+            observed_at TIMESTAMPTZ NOT NULL,
+            received_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            temperature_c DOUBLE PRECISION,
+            humidity_pct DOUBLE PRECISION,
+            pressure_hpa DOUBLE PRECISION,
+            wind_speed_mps DOUBLE PRECISION,
+            wind_direction_deg DOUBLE PRECISION,
+            rainfall_mm DOUBLE PRECISION,
+            rainfall_total_mm DOUBLE PRECISION,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )""")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_sensor_observations_station_time ON sensor_observations(station_id, observed_at DESC)")
         db.execute("""CREATE TABLE IF NOT EXISTS states (
             name TEXT NOT NULL,
             abbreviation TEXT PRIMARY KEY
