@@ -2,10 +2,21 @@
 
 API-only weather service migrated from jmcausey/weather.
 
+## Install
+
+For an interactive first-time setup, run:
+
+```bash
+bash install.sh
+```
+
+The installer opens the official OpenWeatherMap registration or API-key page, asks you to paste your key securely, gathers the remaining configuration, writes a private `.env`, validates Docker Compose configuration, and runs `docker compose up -d --build`. Account registration and email/CAPTCHA verification remain user-assisted; see the [installer guide](docs/installer.md).
+
 ## Documentation
 
 Detailed Markdown documentation is in [docs/](docs/README.md):
 
+- [Interactive installer](docs/installer.md)
 - [Architecture and code map](docs/architecture.md)
 - [HTTP API reference](docs/api-reference.md)
 - [Database schema](docs/database.md)
@@ -27,15 +38,15 @@ Detailed Markdown documentation is in [docs/](docs/README.md):
 
 ## Locations
 
-The repository includes data/locations/locations.json, containing location names and coordinates, and data/locations/states.json for US state-name searching. PostgreSQL loads these datasets on startup.
+The repository includes `data/locations/locations.json`, containing location names and coordinates, and `data/locations/states.json` for US state-name searching. PostgreSQL loads these datasets on startup.
 
 ## Scheduled collection
 
-The scheduler container polls enabled weather_jobs every 30 seconds and runs jobs when their interval is due. A job can collect either current weather or forecast snapshots. Current conditions are stored in the existing chart table. Forecast collection stores every forecast period returned by OpenWeatherMap in weather_forecasts, with both the retrieval time (snapshot_at) and forecast-valid time (valid_at).
+The scheduler container polls enabled `weather_jobs` every 30 seconds and runs jobs when their interval is due. A job can collect either `current` weather or `forecast` snapshots. Current conditions are stored in the existing `chart` table. Forecast collection stores every forecast period returned by OpenWeatherMap in `weather_forecasts`, with both the retrieval time (`snapshot_at`) and forecast-valid time (`valid_at`).
 
 Forecast snapshots are retained instead of overwritten so later you can compare what a forecast predicted with what actually happened. Current conditions from a weather API are not necessarily quality-controlled weather-station observations.
 
-The examples below use Seattle, WA (latitude 47.6062, longitude -122.3321).
+The examples below use Seattle, WA (latitude `47.6062`, longitude `-122.3321`).
 
 Create an hourly current-weather job for Seattle, WA:
 
@@ -58,12 +69,14 @@ Inspect stored actual-weather samples and forecast snapshots with:
     curl -sS 'http://localhost:5000/api/v1/history?location=Seattle%2C%20WA&limit=10'
     curl -sS 'http://localhost:5000/api/v1/forecasts?location=Seattle%2C%20WA&limit=20'
 
-Use last_status and last_error on each job to troubleshoot collection. Allowed intervals are 15, 60, 240, and 1440 minutes.
+Use `last_status` and `last_error` on each job to troubleshoot collection. Allowed intervals are 15, 60, 240, and 1440 minutes.
 
-## Docker
+## Manual Docker setup
+
+If you prefer not to use the installer:
 
     cp .env.example .env
     # set OPENWEATHER_API_KEY and matching PostgreSQL credentials
     docker compose up -d --build
 
-The existing PostgreSQL chart and weather_jobs tables are retained. Startup adds the job_type column to existing installations and creates weather_forecasts without dropping data.
+The existing PostgreSQL `chart` and `weather_jobs` tables are retained. Startup adds the `job_type` column to existing installations and creates `weather_forecasts` without dropping data.
