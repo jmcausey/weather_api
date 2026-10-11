@@ -11,8 +11,27 @@ from .weather import current, forecast, save_current
 api = Blueprint("api", __name__, url_prefix="/api/v1")
 
 
+
+def utc_iso8601(value):
+    """Convert datetime values to ISO 8601 UTC; preserve other JSON values."""
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    if isinstance(value, dict):
+        return {key: utc_iso8601(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [utc_iso8601(item) for item in value]
+    return value
+
+
+def iso_jsonify(payload):
+    """Serialize API response datetimes consistently without changing storage."""
+    return jsonify(utc_iso8601(payload))
+
+
 def error(message, status=400):
-    return jsonify({"error": message}), status
+    return iso_jsonify({"error": message}), status
 
 
 def location_args():
@@ -71,7 +90,7 @@ SENSOR_FIELDS = (
 def health():
     try:
         get_db().execute("SELECT 1").fetchone()
-        return jsonify({"status": "ok"})
+        return iso_jsonify({"status": "ok"})
     except Exception:
         return error("database unavailable", 503)
 
@@ -81,7 +100,7 @@ def locations():
     query = request.args.get("q", "").strip()
     limit = min(max(request.args.get("limit", 50, type=int), 1), 500)
     rows = search_locations(query, limit)
-    return jsonify({"count": len(rows), "items": rows})
+    return iso_jsonify({"count": len(rows), "items": rows})
 
 
 @api.get("/weather")
@@ -90,7 +109,7 @@ def weather():
     if not location and (lat is None or lon is None):
         return error("provide location or latitude and longitude")
     try:
-        return jsonify(current(location, lat, lon))
+        return iso_jsonify(current(location, lat, lon))
     except LookupError as exc:
         return error(str(exc), 404)
     except Exception as exc:
@@ -103,7 +122,7 @@ def weather_forecast():
     if not location and (lat is None or lon is None):
         return error("provide location or latitude and longitude")
     try:
-        return jsonify(forecast(location, lat, lon))
+        return iso_jsonify(forecast(location, lat, lon))
     except LookupError as exc:
         return error(str(exc), 404)
     except Exception as exc:
@@ -121,7 +140,7 @@ def collect():
     try:
         payload = current(location, lat, lon)
         save_current(payload)
-        return jsonify(payload), 201
+        return iso_jsonify(payload), 201
     except LookupError as exc:
         return error(str(exc), 404)
     except Exception as exc:
@@ -175,7 +194,7 @@ def ingest_sensor_observation():
             (station_id, observed_at, *sql_values),
         ).fetchone()
         db.commit()
-    return jsonify({"status": "accepted", "observation": row}), 201
+    return iso_jsonify({"status": "accepted", "observation": row}), 201
 
 
 @api.get("/sensors/<station_id>/latest")
@@ -190,7 +209,7 @@ def latest_sensor_observation(station_id):
     ).fetchone()
     if not row:
         return error("no observations found for station", 404)
-    return jsonify(row)
+    return iso_jsonify(row)
 
 
 @api.get("/sensors/<station_id>/history")
@@ -204,7 +223,7 @@ def sensor_observation_history(station_id):
            ORDER BY observed_at DESC, id DESC LIMIT %s""",
         (station_id, limit),
     ).fetchall()
-    return jsonify({"station_id": station_id, "count": len(rows), "items": rows})
+    return iso_jsonify({"station_id": station_id, "count": len(rows), "items": rows})
 
 
 @api.get("/history")
@@ -222,7 +241,7 @@ def history():
     query += " ORDER BY created_at DESC LIMIT %s"
     params.append(limit)
     rows = get_db().execute(query, params).fetchall()
-    return jsonify({"count": len(rows), "items": rows})
+    return iso_jsonify({"count": len(rows), "items": rows})
 
 
 @api.get("/forecasts")
@@ -240,13 +259,13 @@ def stored_forecasts():
     query += " ORDER BY snapshot_at DESC, valid_at ASC LIMIT %s"
     params.append(limit)
     rows = get_db().execute(query, params).fetchall()
-    return jsonify({"count": len(rows), "items": rows})
+    return iso_jsonify({"count": len(rows), "items": rows})
 
 
 @api.get("/jobs")
 def jobs():
     rows = get_db().execute("SELECT * FROM weather_jobs ORDER BY enabled DESC, name").fetchall()
-    return jsonify({"count": len(rows), "items": rows})
+    return iso_jsonify({"count": len(rows), "items": rows})
 
 
 @api.post("/jobs")
@@ -272,7 +291,7 @@ def create_job():
                  bool(body.get("enabled", True)), job_type),
             ).fetchone()
             db.commit()
-        return jsonify(row), 201
+        return iso_jsonify(row), 201
     except (TypeError, ValueError):
         return error("latitude and longitude must be numbers")
 
@@ -284,7 +303,7 @@ def delete_job(job_id):
         db.commit()
     if result.rowcount == 0:
         return error("job not found", 404)
-    return jsonify({"deleted": job_id})
+    return iso_jsonify({"deleted": job_id})
 
 
 @api.post("/jobs/<int:job_id>/run")
@@ -292,4 +311,4 @@ def run_job(job_id):
     from .tasks import run_weather_job
     if not run_weather_job(job_id):
         return error("job failed; inspect weather_jobs.last_error", 502)
-    return jsonify({"id": job_id, "status": "completed"})
+    return iso_jsonify({"id": job_id, "status": "completed"})
