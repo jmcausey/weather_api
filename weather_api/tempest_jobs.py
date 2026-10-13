@@ -32,7 +32,7 @@ def run_due_tempest_jobs():
     with get_db() as db:
         rows = db.execute(
             """SELECT station_id FROM tempest_jobs WHERE enabled=TRUE
-               AND (last_run_at IS NULL OR last_run_at <= CURRENT_TIMESTAMP -
+               AND (last_status='queued' OR last_run_at IS NULL OR last_run_at <= CURRENT_TIMESTAMP -
                     interval_minutes * INTERVAL '1 minute')
                FOR UPDATE SKIP LOCKED"""
         ).fetchall()
