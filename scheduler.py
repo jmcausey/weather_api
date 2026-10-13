@@ -3,6 +3,7 @@ import time
 
 from weather_api import create_app
 from weather_api.tasks import run_due_weather_jobs
+from weather_api.tempest_jobs import run_due_tempest_jobs
 
 app = create_app()
 
@@ -11,6 +12,7 @@ if __name__ == "__main__":
     while True:
         with app.app_context():
             results = run_due_weather_jobs()
+            run_due_tempest_jobs()
         if results:
             print(f"Ran weather jobs: {results}")
         time.sleep(30)
