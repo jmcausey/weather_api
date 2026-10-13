@@ -363,7 +363,15 @@ def remove_tempest_station(station_id):
 
 @api.post("/tempest/stations/<station_id>/run")
 def collect_tempest_now(station_id):
-    from .tempest_jobs import run_tempest_job
-    if not run_tempest_job(station_id):
-        return error("station job unavailable or failed; inspect last_error", 502)
-    return iso_jsonify({"station_id": station_id, "status": "completed"})
+    """Queue collection for the scheduler; never run Chromium in Gunicorn."""
+    with get_db() as db:
+        row = db.execute(
+            """UPDATE tempest_jobs SET last_status='queued',
+               updated_at=CURRENT_TIMESTAMP WHERE station_id=%s AND enabled=TRUE
+               RETURNING station_id""",
+            (station_id,),
+        ).fetchone()
+        db.commit()
+    if not row:
+        return error("enabled station job not found", 404)
+    return iso_jsonify({"station_id": station_id, "status": "queued"}), 202
