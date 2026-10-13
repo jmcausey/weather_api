@@ -117,7 +117,7 @@ curl -X POST http://localhost:5000/api/v1/tempest/stations/156550/run \\
 curl http://localhost:5000/api/v1/sensors/156550/latest
 ```
 
-Observations are stored in `sensor_observations` with Celsius, hPa,
+Manual run requests return HTTP 202 with `status: queued`. The scheduler\nperforms the browser scrape asynchronously; inspect the station job's\n`last_status` and `last_error` for the eventual outcome.\n\nObservations are stored in `sensor_observations` with Celsius, hPa,
 meters/second, degrees, and millimeters. Existing observations with the
 same station and timestamp are updated instead of duplicated. Page layout
 changes or missing live timestamps fail the job explicitly and populate
