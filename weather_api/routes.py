@@ -322,9 +322,6 @@ def tempest_stations():
 
 @api.post("/tempest/stations")
 def register_tempest_station():
-    auth_error = require_sensor_key()
-    if auth_error:
-        return auth_error
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         return error("request body must be a JSON object")
@@ -356,9 +353,6 @@ def register_tempest_station():
 
 @api.delete("/tempest/stations/<station_id>")
 def remove_tempest_station(station_id):
-    auth_error = require_sensor_key()
-    if auth_error:
-        return auth_error
     with get_db() as db:
         result = db.execute("DELETE FROM tempest_jobs WHERE station_id=%s", (station_id,))
         db.commit()
@@ -369,9 +363,6 @@ def remove_tempest_station(station_id):
 
 @api.post("/tempest/stations/<station_id>/run")
 def collect_tempest_now(station_id):
-    auth_error = require_sensor_key()
-    if auth_error:
-        return auth_error
     from .tempest_jobs import run_tempest_job
     if not run_tempest_job(station_id):
         return error("station job unavailable or failed; inspect last_error", 502)
