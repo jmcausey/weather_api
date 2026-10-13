@@ -366,7 +366,7 @@ def collect_tempest_now(station_id):
     """Queue collection for the scheduler; never run Chromium in Gunicorn."""
     with get_db() as db:
         row = db.execute(
-            """UPDATE tempest_jobs SET last_status='queued',
+            """UPDATE tempest_jobs SET last_status='queued', last_error=NULL,
                updated_at=CURRENT_TIMESTAMP WHERE station_id=%s AND enabled=TRUE
                RETURNING station_id""",
             (station_id,),
