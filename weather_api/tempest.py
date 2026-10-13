@@ -131,22 +131,33 @@ def scrape_tempest_station(station_id):
             response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
             if response is None or response.status >= 400:
                 raise RuntimeError("Tempest station page unavailable")
-            page.wait_for_function(
-                """() => document.body && /Air Temperature|Relative Humidity/.test(document.body.innerText)""",
-                timeout=30000,
-            )
+            # Match the original working scraper's render wait. Tempest's public
+            # page does not reliably include the exact "Air Temperature" label
+            # in body.innerText, so waiting for that phrase causes false timeouts.
+            page.wait_for_timeout(7000)
             texts = page.evaluate("""() => {
-                const nodes = document.querySelectorAll('span, div, p, time, label');
-                return Array.from(nodes)
-                  .filter(el => el.children.length === 0)
-                  .map(el => (el.innerText || el.textContent || '').trim())
-                  .filter(Boolean);
+                const elements = document.querySelectorAll('span, div, p, time, label');
+                const results = [];
+                elements.forEach(el => {
+                    const text = el.innerText ? el.innerText.trim() : '';
+                    if (text) results.push(text);
+                });
+                return results;
             }""")
-            # Text-node leaves can split labels and values; retain line-based fallback.
+            # Keep all visible text, including nested elements: Tempest sometimes
+            # renders the label and value in different descendants.
             try:
                 observation = extract_readings(texts)
-            except ValueError:
-                observation = extract_readings(page.locator("body").inner_text().splitlines())
+            except ValueError as first_error:
+                body_text = page.locator("body").inner_text()
+                lines = [line.strip() for line in body_text.splitlines() if line.strip()]
+                try:
+                    observation = extract_readings(lines)
+                except ValueError as exc:
+                    raise ValueError(
+                        f"Tempest page rendered but readings could not be parsed: {exc}; "
+                        f"visible text sample: {body_text[:1200]!r}"
+                    ) from first_error
             return {"station_id": station_id, **observation}
         finally:
             browser.close()
