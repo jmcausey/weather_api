@@ -330,7 +330,7 @@ def register_tempest_station():
         return error("request body must be a JSON object")
     import re
     station_id = str(body.get("station_id", "")).strip()
-    if not re.fullmatch(r"\\d{1,20}", station_id):
+    if not re.fullmatch(r"\d{1,20}", station_id):
         return error("station_id must contain 1 to 20 digits")
     name = body.get("name", f"Tempest {station_id}")
     interval = body.get("interval_minutes", 15)
