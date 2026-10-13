@@ -2,4 +2,3 @@ Flask
 requests
 psycopg[binary]
 gunicorn
-playwright>=1.55,<2
