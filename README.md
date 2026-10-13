@@ -101,8 +101,10 @@ OpenWeatherMap coordinates are not needed. The Docker image installs Chromium
 and its runtime dependencies. The scheduler collects enabled stations every
 15, 60, 240, or 1440 minutes.
 
-Set `SENSOR_INGEST_API_KEY` in `.env` to authorize station registration,
-deletion and manual collection. For station 156550:
+Tempest registration, deletion, and manual collection use no API key; the
+Playwright browser scrapes the public station webpage. The separate
+`SENSOR_INGEST_API_KEY` remains required only for sensor-device uploads.
+For station 156550:
 
 ```bash
 curl -X POST http://localhost:5000/api/v1/tempest/stations \\
