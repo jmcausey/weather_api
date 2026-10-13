@@ -83,15 +83,6 @@ def init_db(app):
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         )""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_sensor_observations_station_time ON sensor_observations(station_id, observed_at DESC)")
-        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_sensor_observations_station_observed ON sensor_observations(station_id, observed_at)")
-        db.execute("""CREATE TABLE IF NOT EXISTS tempest_jobs (
-            station_id TEXT PRIMARY KEY, name TEXT NOT NULL,
-            interval_minutes INTEGER NOT NULL CHECK (interval_minutes IN (15,60,240,1440)),
-            enabled BOOLEAN NOT NULL DEFAULT TRUE, last_run_at TIMESTAMPTZ,
-            last_status TEXT, last_error TEXT,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )""")
         db.execute("""CREATE TABLE IF NOT EXISTS states (
             name TEXT NOT NULL,
             abbreviation TEXT PRIMARY KEY
