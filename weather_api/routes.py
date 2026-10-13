@@ -312,3 +312,67 @@ def run_job(job_id):
     if not run_weather_job(job_id):
         return error("job failed; inspect weather_jobs.last_error", 502)
     return iso_jsonify({"id": job_id, "status": "completed"})
+
+
+@api.get("/tempest/stations")
+def tempest_stations():
+    rows = get_db().execute("SELECT * FROM tempest_jobs ORDER BY name").fetchall()
+    return iso_jsonify({"count": len(rows), "items": rows})
+
+
+@api.post("/tempest/stations")
+def register_tempest_station():
+    auth_error = require_sensor_key()
+    if auth_error:
+        return auth_error
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return error("request body must be a JSON object")
+    import re
+    station_id = str(body.get("station_id", "")).strip()
+    if not re.fullmatch(r"\\d{1,20}", station_id):
+        return error("station_id must contain 1 to 20 digits")
+    name = body.get("name", f"Tempest {station_id}")
+    interval = body.get("interval_minutes", 15)
+    if not isinstance(name, str) or not name.strip() or len(name) > 120:
+        return error("name must be a non-empty string of at most 120 characters")
+    if type(interval) is not int or interval not in (15, 60, 240, 1440):
+        return error("interval_minutes must be 15, 60, 240, or 1440")
+    if type(body.get("enabled", True)) is not bool:
+        return error("enabled must be boolean")
+    with get_db() as db:
+        row = db.execute(
+            """INSERT INTO tempest_jobs (station_id,name,interval_minutes,enabled)
+               VALUES (%s,%s,%s,%s)
+               ON CONFLICT (station_id) DO UPDATE SET
+                 name=EXCLUDED.name,interval_minutes=EXCLUDED.interval_minutes,
+                 enabled=EXCLUDED.enabled,updated_at=CURRENT_TIMESTAMP
+               RETURNING *""",
+            (station_id, name.strip(), interval, body.get("enabled", True)),
+        ).fetchone()
+        db.commit()
+    return iso_jsonify(row), 201
+
+
+@api.delete("/tempest/stations/<station_id>")
+def remove_tempest_station(station_id):
+    auth_error = require_sensor_key()
+    if auth_error:
+        return auth_error
+    with get_db() as db:
+        result = db.execute("DELETE FROM tempest_jobs WHERE station_id=%s", (station_id,))
+        db.commit()
+    if result.rowcount == 0:
+        return error("station job not found", 404)
+    return iso_jsonify({"deleted": station_id})
+
+
+@api.post("/tempest/stations/<station_id>/run")
+def collect_tempest_now(station_id):
+    auth_error = require_sensor_key()
+    if auth_error:
+        return auth_error
+    from .tempest_jobs import run_tempest_job
+    if not run_tempest_job(station_id):
+        return error("station job unavailable or failed; inspect last_error", 502)
+    return iso_jsonify({"station_id": station_id, "status": "completed"})
