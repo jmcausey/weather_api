@@ -2,6 +2,7 @@ import os
 from flask import Flask
 from .db import init_db
 from .routes import api
+from .graphs import graphs
 
 
 def create_app(test_config=None):
@@ -16,4 +17,5 @@ def create_app(test_config=None):
         app.config.update(test_config)
     init_db(app)
     app.register_blueprint(api)
+    app.register_blueprint(graphs)
     return app
