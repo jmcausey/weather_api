@@ -80,34 +80,29 @@ def _first_nonempty(row: dict[str, Any], *keys: str) -> Any:
 
 
 def normalize_location(row: dict[str, Any]) -> dict[str, Any]:
-    """Add consistent hierarchy keys while preserving every original API field."""
+    """Preserve API fields and build a consistent hierarchy for the menus."""
     item = dict(row)
     display = str(_first_nonempty(item, "display_name", "name", "city") or "").strip()
-    name = str(_first_nonempty(item, "city", "name") or display).strip()
-
-    # Existing dataset display names are commonly "City, ST" or "City, Country".
     parts = [part.strip() for part in display.rsplit(",", 1)]
     suffix = parts[-1] if len(parts) == 2 else ""
 
-    explicit_country = _first_nonempty(item, "country", "country_name")
-    explicit_state = _first_nonempty(item, "state", "state_name", "admin1")
-    explicit_region = _first_nonempty(item, "region", "region_name", "admin_region")
-
-    suffix_is_state = suffix.upper() in US_STATE_CODES
-    country = str(explicit_country or ("United States" if suffix_is_state else suffix or "Unknown"))
-    state = str(explicit_state or (suffix if suffix_is_state else ""))
-    region = str(explicit_region or state or "Unspecified")
     city = str(_first_nonempty(item, "city", "name") or (parts[0] if parts else display))
+    region = str(_first_nonempty(item, "region") or "")
+    country = str(_first_nonempty(item, "country") or suffix or "Unknown")
+    state = str(_first_nonempty(item, "state") or "")
 
-    # Preserve the API's original fields; add normalized hierarchy fields.
-    item.setdefault("display_name", display or name)
+    # Compatibility for older API deployments that do not yet return normalized fields.
+    if not item.get("country") and suffix.upper() in US_STATE_CODES:
+        country = "United States"
+    if not item.get("state") and suffix.upper() in US_STATE_CODES:
+        state = suffix
+
+    item.setdefault("display_name", display or city)
     item.setdefault("city", city)
-    item.setdefault("region", explicit_region or region)
     item.setdefault("country", country)
-    item.setdefault("state", state)
-    item.setdefault("name", name)
+    item.setdefault("state", state or None)
     item["hierarchy"] = {
-        "region": region,
+        "region": region or (state or country),
         "country": country,
         "state": state or None,
         "city": city,
