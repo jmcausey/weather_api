@@ -35,16 +35,12 @@ def load_states(db, data_path):
 
 
 def load_locations(db, data_path):
-    """Import the bundled locations JSON into PostgreSQL once, safely across workers."""
+    """Import locations and normalize city/state/country fields."""
     data_path = Path(data_path)
     if not data_path.is_file():
         raise FileNotFoundError(f"locations dataset not found: {data_path}")
 
     db.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", ("weather_api:locations",))
-    existing = db.execute("SELECT COUNT(*) AS count FROM locations").fetchone()["count"]
-    if existing:
-        return existing
-
     with data_path.open("r", encoding="utf-8") as fh:
         locations = json.load(fh)
 
@@ -56,23 +52,38 @@ def load_locations(db, data_path):
         if not isinstance(latitude, (int, float)) or not isinstance(longitude, (int, float)):
             continue
 
-        name, separator, region = display_name.rpartition(", ")
+        city, separator, region = display_name.rpartition(", ")
         if not separator:
-            name, region = display_name, None
+            city, region = display_name, None
 
-        rows.append((display_name, name, region, float(latitude), float(longitude)))
+        rows.append((display_name, city, region, float(latitude), float(longitude)))
 
     with db.cursor() as cur:
         cur.executemany(
             """INSERT INTO locations
-               (display_name, name, region, latitude, longitude)
-               VALUES (%s, %s, %s, %s, %s)
+               (display_name, name, region, city, country, state, latitude, longitude)
+               VALUES (
+                   %s, %s, %s, %s,
+                   CASE WHEN EXISTS (
+                       SELECT 1 FROM states s
+                       WHERE upper(s.abbreviation) = upper(COALESCE(%s, ''))
+                   ) THEN 'United States' ELSE %s END,
+                   (SELECT s.name FROM states s
+                    WHERE upper(s.abbreviation) = upper(COALESCE(%s, '')) LIMIT 1),
+                   %s, %s
+               )
                ON CONFLICT (display_name) DO UPDATE SET
                    name = EXCLUDED.name,
                    region = EXCLUDED.region,
+                   city = EXCLUDED.city,
+                   country = EXCLUDED.country,
+                   state = EXCLUDED.state,
                    latitude = EXCLUDED.latitude,
                    longitude = EXCLUDED.longitude""",
-            rows,
+            [
+                (display_name, city, region, city, region, region, region, latitude, longitude)
+                for display_name, city, region, latitude, longitude in rows
+            ],
         )
 
     return len(rows)
@@ -94,26 +105,41 @@ def find_location(location):
     ).fetchone()
 
 
-def search_locations(query, limit=50):
-    """Search by display name, city/name, region abbreviation, or full state name."""
+def search_locations(query="", limit=50, region=None, country=None, state=None, city=None):
+    """Search locations by text and optional hierarchy filters."""
     from .db import get_db
 
     query = (query or "").strip()
-    pattern = f"%{query}%"
+    clauses = []
+    params = []
 
-    return get_db().execute(
-        """SELECT display_name, name, region, latitude, longitude
-           FROM locations
-           WHERE lower(display_name) LIKE lower(%s)
-              OR lower(name) LIKE lower(%s)
-              OR lower(COALESCE(region, '')) LIKE lower(%s)
-              OR EXISTS (
-                  SELECT 1
-                  FROM states s
-                  WHERE lower(s.name) LIKE lower(%s)
-                    AND upper(COALESCE(locations.region, '')) = s.abbreviation
-              )
-           ORDER BY name, region, display_name
-           LIMIT %s""",
-        (pattern, pattern, pattern, pattern, limit),
-    ).fetchall()
+    if query:
+        pattern = f"%{query}%"
+        clauses.append("""(
+            lower(display_name) LIKE lower(%s)
+            OR lower(name) LIKE lower(%s)
+            OR lower(COALESCE(region, '')) LIKE lower(%s)
+            OR lower(COALESCE(country, '')) LIKE lower(%s)
+            OR lower(COALESCE(state, '')) LIKE lower(%s)
+            OR EXISTS (
+                SELECT 1 FROM states s
+                WHERE lower(s.name) LIKE lower(%s)
+                  AND upper(COALESCE(locations.region, '')) = s.abbreviation
+            )
+        )""")
+        params.extend([pattern] * 6)
+
+    for column, value in (("region", region), ("country", country),
+                          ("state", state), ("city", city)):
+        if value:
+            clauses.append(f"lower(COALESCE({column}, '')) = lower(%s)")
+            params.append(value.strip())
+
+    sql = """SELECT display_name, name, region, country, state, city,
+                    latitude, longitude
+             FROM locations"""
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    sql += " ORDER BY country NULLS LAST, state NULLS LAST, city, display_name LIMIT %s"
+    params.append(limit)
+    return get_db().execute(sql, params).fetchall()
