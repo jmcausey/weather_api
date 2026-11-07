@@ -43,7 +43,7 @@ Searches the local location dataset imported into PostgreSQL. Results include no
 | `country` | empty | Exact country filter (for example, `United States` or `Afghanistan`). |
 | `state` | empty | Exact state/province filter (currently normalized for US states). |
 | `city` | empty | Exact city filter. |
-| `limit` | 50 | Result count, clamped to 1–500. |
+| `limit` | 50 | Page size, clamped to 1–500. |\n| `offset` | 0 | Number of matching rows to skip; use with `limit` to page through the full result set. |
 
 Hierarchy filters can be combined. Each supplied filter narrows the result set (AND behavior).
 
@@ -83,7 +83,7 @@ Response shape:
 }
 ```
 
-The legacy `region` field is retained for compatibility: in US records it contains the state abbreviation, while in international records it contains the original country suffix. Use the explicit `country`, `state`, and `city` fields for unambiguous filtering. State names are normalized from the bundled US state lookup. The current source dataset does not contain continent or global administrative-region metadata, so those values are not fabricated. Existing PostgreSQL rows are backfilled on startup without dropping location data.
+Responses also include `total`, `limit`, `offset`, and `has_more` for pagination. Use `offset=0`, then advance by the number of returned items until `has_more` is false. The legacy `region` field is retained for compatibility: in US records it contains the state abbreviation, while in international records it contains the original country suffix. Use the explicit `country`, `state`, and `city` fields for unambiguous filtering. State names are normalized from the bundled US state lookup. The current source dataset does not contain continent or global administrative-region metadata, so those values are not fabricated. Existing PostgreSQL rows are backfilled on startup without dropping location data.
 
 ## Current weather
 
