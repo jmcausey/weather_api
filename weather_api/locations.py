@@ -105,7 +105,7 @@ def find_location(location):
     ).fetchone()
 
 
-def search_locations(query="", limit=50, region=None, country=None, state=None, city=None):
+def search_locations(query="", limit=50, offset=0, region=None, country=None, state=None, city=None):
     """Search locations by text and optional hierarchy filters."""
     from .db import get_db
 
@@ -140,6 +140,11 @@ def search_locations(query="", limit=50, region=None, country=None, state=None, 
              FROM locations"""
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
-    sql += " ORDER BY country NULLS LAST, state NULLS LAST, city, display_name LIMIT %s"
-    params.append(limit)
-    return get_db().execute(sql, params).fetchall()
+    where_sql = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    count = get_db().execute(
+        "SELECT COUNT(*) AS total FROM locations" + where_sql, params
+    ).fetchone()["total"]
+    sql += " ORDER BY country NULLS LAST, state NULLS LAST, city, display_name LIMIT %s OFFSET %s"
+    params.extend([limit, offset])
+    rows = get_db().execute(sql, params).fetchall()
+    return rows, count
