@@ -96,6 +96,26 @@ def init_db(app):
         )""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_locations_name ON locations(name)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_locations_region ON locations(region)")
+        db.execute("ALTER TABLE locations ADD COLUMN IF NOT EXISTS country TEXT")
+        db.execute("ALTER TABLE locations ADD COLUMN IF NOT EXISTS state TEXT")
+        db.execute("ALTER TABLE locations ADD COLUMN IF NOT EXISTS city TEXT")
+        # Backfill old installations without dropping or reloading their location rows.
+        db.execute("""UPDATE locations
+                      SET city = COALESCE(city, name),
+                          state = COALESCE(state, (
+                              SELECT s.name FROM states s
+                              WHERE upper(s.abbreviation) = upper(COALESCE(locations.region, ''))
+                              LIMIT 1
+                          )),
+                          country = COALESCE(country, CASE
+                              WHEN EXISTS (
+                                  SELECT 1 FROM states s
+                                  WHERE upper(s.abbreviation) = upper(COALESCE(locations.region, ''))
+                              ) THEN 'United States'
+                              ELSE NULLIF(region, '')
+                          END)""")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_locations_country_state_city ON locations(country, state, city)")
+
         data_dir = Path(app.root_path).parent / "data" / "locations"
         load_states(db, data_dir / "states.json")
         load_locations(db, data_dir / "locations.json")
