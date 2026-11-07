@@ -85,6 +85,51 @@ Response shape:
 
 Responses also include `total`, `limit`, `offset`, and `has_more` for pagination. Use `offset=0`, then advance by the number of returned items until `has_more` is false. The legacy `region` field is retained for compatibility: in US records it contains the state abbreviation, while in international records it contains the original country suffix. Use the explicit `country`, `state`, and `city` fields for unambiguous filtering. State names are normalized from the bundled US state lookup. The current source dataset does not contain continent or global administrative-region metadata, so those values are not fabricated. Existing PostgreSQL rows are backfilled on startup without dropping location data.
 
+
+### Global GeoNames locations
+
+The legacy `GET /api/v1/locations` endpoint remains unchanged and continues to search the bundled catalog. The normalized worldwide GeoNames dataset is exposed separately so existing clients and legacy `display_name` identifiers are not changed.
+
+#### `GET /api/v1/locations/geonames`
+
+Searches the imported GeoNames populated-place catalog. It returns source identifiers, coordinates, timezone, population, and the available continent/country/state/county hierarchy. Missing GeoNames subdivisions remain null; the API does not infer them.
+
+| Parameter | Default | Description |
+|---|---:|---|
+| `q` | empty | Case-insensitive partial search across city, ASCII city, country, state, and county; a numeric GeoNames ID can be searched exactly. |
+| `continent` | empty | Exact case-insensitive continent name. |
+| `country` | empty | Exact case-insensitive country name. |
+| `country_code` | empty | ISO alpha-2, alpha-3, or numeric country code. |
+| `state` | empty | Exact case-insensitive first-level administrative name. |
+| `county` | empty | Exact case-insensitive second-level administrative name. |
+| `city` | empty | Exact case-insensitive populated-place name. |
+| `limit` | 50 | Page size, clamped to 1–500. |
+| `offset` | 0 | Number of matching records to skip. |
+
+Filters combine with AND semantics. Results are ordered by population descending, then city name and GeoNames ID for stable pagination.
+
+Build the source database from the `jmcausey/locations` repository, then import it into the weather_api PostgreSQL database:
+
+```bash
+# In a checkout of jmcausey/locations:
+python3 scripts/build_database.py
+
+# In a checkout of jmcausey/weather_api with DATABASE_URL configured:
+python3 scripts/import_geonames.py --sqlite ../locations/data/locations.sqlite3
+```
+
+The import creates separate `geo_countries`, `geo_admin1`, `geo_admin2`, and `geo_places` tables and upserts source rows by their GeoNames keys. It does not delete or rewrite the legacy `locations` table, weather jobs, or weather history. Re-running the importer refreshes rows present in the source snapshot; removed upstream records are retained until explicitly cleaned up.
+
+Examples:
+
+```bash
+curl -sS 'http://localhost:5000/api/v1/locations/geonames?country_code=US&state=Texas&city=Malakoff'
+curl -sS 'http://localhost:5000/api/v1/locations/geonames?continent=Europe&country=France&limit=100'
+curl -sS 'http://localhost:5000/api/v1/locations/geonames?q=Seattle&limit=20&offset=0'
+```
+
+The response includes `source`, `count`, `total`, `limit`, `offset`, `has_more`, and an `items` array. GeoNames data is licensed under CC BY 4.0; preserve the attribution required by [GeoNames](https://www.geonames.org/export/) when redistributing imported data.
+
 ## Current weather
 
 ### `GET /api/v1/weather`
