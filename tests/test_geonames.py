@@ -74,7 +74,7 @@ class GeoNamesTests(unittest.TestCase):
         self.assertIn("ORDER BY p.population DESC, lower(p.name), p.geoname_id", select_sql)
         self.assertEqual(count_params, select_params[:-2])
         self.assertEqual(select_params[-2:], [25, 50])
-        self.assertEqual(len(count_params), 11)
+        self.assertEqual(len(count_params), 14)
 
 
 if __name__ == "__main__":
