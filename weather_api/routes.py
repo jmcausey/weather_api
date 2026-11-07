@@ -6,6 +6,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from .db import get_db
 from .locations import search_locations
+from .geonames import search_geonames
 from .weather import current, forecast, save_current
 
 api = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -110,6 +111,32 @@ def locations():
     return iso_jsonify({
         "count": len(rows), "total": total, "limit": limit,
         "offset": offset, "has_more": offset + len(rows) < total, "items": rows
+    })
+
+ 
+@api.get("/locations/geonames")
+def geonames_locations():
+    """Search the separately imported global GeoNames gazetteer."""
+    limit = min(max(request.args.get("limit", 50, type=int) or 50, 1), 500)
+    offset = max(request.args.get("offset", 0, type=int) or 0, 0)
+    filters = {
+        "query": request.args.get("q", "").strip(),
+        "continent": request.args.get("continent", "").strip() or None,
+        "country": request.args.get("country", "").strip() or None,
+        "country_code": request.args.get("country_code", "").strip() or None,
+        "state": request.args.get("state", "").strip() or None,
+        "county": request.args.get("county", "").strip() or None,
+        "city": request.args.get("city", "").strip() or None,
+    }
+    rows, total = search_geonames(get_db(), **filters, limit=limit, offset=offset)
+    return iso_jsonify({
+        "source": "GeoNames",
+        "count": len(rows),
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "has_more": offset + len(rows) < total,
+        "items": rows,
     })
 
 
