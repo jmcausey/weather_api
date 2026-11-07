@@ -5,6 +5,7 @@ from flask import current_app, g
 from psycopg.rows import dict_row
 
 from .locations import load_locations, load_states
+from .geonames import ensure_geonames_schema
 
 def get_db():
     if "db" not in g or g.db.closed:
@@ -119,4 +120,6 @@ def init_db(app):
         data_dir = Path(app.root_path).parent / "data" / "locations"
         load_states(db, data_dir / "states.json")
         load_locations(db, data_dir / "locations.json")
+        # Create empty normalized GeoNames tables on every install; data is imported explicitly.
+        ensure_geonames_schema(db)
         db.commit()

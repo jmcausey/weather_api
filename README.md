@@ -36,6 +36,20 @@ Detailed Markdown documentation is in [docs/](docs/README.md):
 - DELETE /api/v1/jobs/{id}
 - POST /api/v1/jobs/{id}/run
 
+## Global GeoNames catalog
+
+A normalized global populated-place catalog can be imported from [jmcausey/locations](https://github.com/jmcausey/locations) without replacing the bundled legacy location catalog.
+
+```bash
+# In a checkout of jmcausey/locations:
+python3 scripts/build_database.py
+
+# In this repository, with DATABASE_URL configured:
+python3 scripts/import_geonames.py --sqlite ../locations/data/locations.sqlite3
+```
+
+Search it with `GET /api/v1/locations/geonames`. Supported filters include continent, country name/code, state/province, county/district, city, and free-text query. Results include coordinates, timezone, population, GeoNames IDs, and bounded pagination. The existing `GET /api/v1/locations` endpoint and its display-name keys remain intact. See [the API reference](docs/api-reference.md#global-geonames-locations) for details and attribution requirements.
+
 ## Locations
 
 The repository includes `data/locations/locations.json`, containing location names and coordinates, and `data/locations/states.json` for US state-name searching. PostgreSQL loads these datasets on startup.
