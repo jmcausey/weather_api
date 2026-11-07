@@ -1,7 +1,12 @@
 """Focused unit tests for the GeoNames PostgreSQL integration helpers."""
+import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 
-from weather_api.geonames import ensure_geonames_schema, search_geonames
+from weather_api.geonames import (
+    ensure_geonames_schema, import_geonames_sqlite, search_geonames,
+)
 
 
 class FakeResult:
@@ -29,12 +34,39 @@ class FakeDB:
         return FakeResult(rows=[{"geoname_id": 123, "city": "Seattle"}])
 
 
+class FakeCursor:
+    def __init__(self, db):
+        self.db = db
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def executemany(self, sql, rows):
+        rows = list(rows)
+        self.db.inserts.append((sql, rows))
+
+
 class SchemaDB:
     def __init__(self):
         self.statements = []
+        self.inserts = []
+        self.commits = 0
+        self.rollbacks = 0
 
     def execute(self, sql):
         self.statements.append(sql)
+
+    def cursor(self):
+        return FakeCursor(self)
+
+    def commit(self):
+        self.commits += 1
+
+    def rollback(self):
+        self.rollbacks += 1
 
 
 class GeoNamesTests(unittest.TestCase):
@@ -49,6 +81,40 @@ class GeoNamesTests(unittest.TestCase):
         self.assertIn("CREATE TABLE IF NOT EXISTS geo_places", sql)
         self.assertIn("CREATE INDEX IF NOT EXISTS idx_geo_places_name", sql)
         self.assertNotIn("DROP TABLE", sql)
+
+    def test_sqlite_import_upserts_all_hierarchy_levels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "locations.sqlite3"
+            source = sqlite3.connect(path)
+            source.executescript("""
+                CREATE TABLE countries (
+                    iso2, iso3, iso_numeric, fips_code, name, capital,
+                    continent_code, languages, population, area_sq_km,
+                    currency_code, tld, neighbours, geoname_id
+                );
+                CREATE TABLE admin1 (country_iso2, admin1_code, name, ascii_name, geoname_id);
+                CREATE TABLE admin2 (country_iso2, admin1_code, admin2_code, name, ascii_name, geoname_id);
+                CREATE TABLE places (
+                    geoname_id, name, ascii_name, latitude, longitude, feature_code,
+                    country_iso2, admin1_code, admin2_code, admin3_code, admin4_code,
+                    population, elevation_m, dem_m, timezone, modified_date
+                );
+                INSERT INTO countries VALUES
+                    ('US','USA','840','US','United States','Washington','NA','en',0,0,'USD','.us','CA',6252001);
+                INSERT INTO admin1 VALUES ('US','WA','Washington','Washington',5815135);
+                INSERT INTO admin2 VALUES ('US','WA','033','King County','King County',5799783);
+                INSERT INTO places VALUES
+                    (5809844,'Seattle','Seattle',47.6062,-122.3321,'PPL','US','WA','033','','',737015,56,0,'America/Los_Angeles','2026-01-01');
+            """)
+            source.close()
+
+            db = SchemaDB()
+            counts = import_geonames_sqlite(db, path, batch_size=1)
+            self.assertEqual(counts, {"countries": 1, "admin1": 1, "admin2": 1, "places": 1})
+            self.assertEqual(len(db.inserts), 4)
+            self.assertTrue(all("ON CONFLICT" in sql for sql, _ in db.inserts))
+            self.assertEqual(db.commits, 1)
+            self.assertEqual(db.rollbacks, 0)
 
     def test_search_combines_hierarchy_filters_and_paginates_stably(self):
         db = FakeDB()
