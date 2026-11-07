@@ -10,7 +10,7 @@ from weather_api.geonames import import_geonames_sqlite
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--sqlite", default="data/locations/locations.sqlite3",
+    parser.add_argument("--sqlite", default="../locations/data/locations.sqlite3",
                         help="Path to the database built by jmcausey/locations")
     parser.add_argument("--database-url", default=os.environ.get("DATABASE_URL"),
                         help="PostgreSQL URL (defaults to DATABASE_URL)")
