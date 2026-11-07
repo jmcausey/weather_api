@@ -49,14 +49,14 @@ def ensure_geonames_schema(db):
 
 
 def _copy_table(source, target, select_sql, insert_sql, batch_size=5000):
-    cursor = source.execute(select_sql)
+    source_cursor = source.execute(select_sql)
     total = 0
     while True:
-        rows = cursor.fetchmany(batch_size)
+        rows = source_cursor.fetchmany(batch_size)
         if not rows:
             break
-        with target.cursor() as cursor:
-            cursor.executemany(insert_sql, rows)
+        with target.cursor() as target_cursor:
+            target_cursor.executemany(insert_sql, rows)
         total += len(rows)
     return total
 
