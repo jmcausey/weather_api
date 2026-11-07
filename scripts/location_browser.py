@@ -55,16 +55,25 @@ class LocationsAPI:
         self.session.headers.update({"Accept": "application/json"})
 
     def search(self, query: str = "", limit: int = 500) -> list[dict[str, Any]]:
-        response = self.session.get(
-            f"{self.base_url}/api/v1/locations",
-            params={"q": query, "limit": limit},
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
-            raise ValueError("Unexpected locations response; expected an object with an 'items' list")
-        return [row for row in payload["items"] if isinstance(row, dict)]
+        """Fetch every matching page so interactive selection is not limited to 500 rows."""
+        items: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            response = self.session.get(
+                f"{self.base_url}/api/v1/locations",
+                params={"q": query, "limit": limit, "offset": offset},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+                raise ValueError("Unexpected locations response; expected an object with an 'items' list")
+            page = [row for row in payload["items"] if isinstance(row, dict)]
+            items.extend(page)
+            if not payload.get("has_more", len(page) == limit) or not page:
+                break
+            offset += len(page)
+        return items
 
     def get_available_data(self, location: dict[str, Any]) -> dict[str, Any]:
         """Return the complete location record exactly as supplied by the API."""
