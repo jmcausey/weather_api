@@ -103,10 +103,14 @@ def locations():
     state = request.args.get("state", "").strip() or None
     city = request.args.get("city", "").strip() or None
     limit = min(max(request.args.get("limit", 50, type=int), 1), 500)
-    rows = search_locations(
-        query, limit, region=region, country=country, state=state, city=city
+    offset = max(request.args.get("offset", 0, type=int), 0)
+    rows, total = search_locations(
+        query, limit, offset=offset, region=region, country=country, state=state, city=city
     )
-    return iso_jsonify({"count": len(rows), "items": rows})
+    return iso_jsonify({
+        "count": len(rows), "total": total, "limit": limit,
+        "offset": offset, "has_more": offset + len(rows) < total, "items": rows
+    })
 
 
 @api.get("/weather")
