@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated GeoNames database artifact (build locally; do not commit)
+data/locations/locations.sqlite3
