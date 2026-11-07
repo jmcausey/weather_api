@@ -55,7 +55,8 @@ def _copy_table(source, target, select_sql, insert_sql, batch_size=5000):
         rows = cursor.fetchmany(batch_size)
         if not rows:
             break
-        target.executemany(insert_sql, rows)
+        with target.cursor() as cursor:
+            cursor.executemany(insert_sql, rows)
         total += len(rows)
     return total
 
