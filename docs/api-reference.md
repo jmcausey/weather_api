@@ -34,18 +34,33 @@ A database connection failure returns HTTP 503 with an error message.
 
 ### `GET /api/v1/locations`
 
-Searches the local location dataset imported into PostgreSQL.
+Searches the local location dataset imported into PostgreSQL. Results include normalized hierarchy fields and coordinates.
 
 | Parameter | Default | Description |
 |---|---:|---|
-| `q` | empty | Case-insensitive partial match against display name, city/name, region abbreviation, or full US state name. |
+| `q` | empty | Case-insensitive partial match across display name, city, region, country, and state. |
+| `region` | empty | Exact, case-insensitive match against the source dataset's region suffix (for example, `TX`). |
+| `country` | empty | Exact country filter (for example, `United States` or `Afghanistan`). |
+| `state` | empty | Exact state/province filter (currently normalized for US states). |
+| `city` | empty | Exact city filter. |
 | `limit` | 50 | Result count, clamped to 1–500. |
+
+Hierarchy filters can be combined. Each supplied filter narrows the result set (AND behavior).
 
 Examples:
 
 ```bash
+# Text search
 curl -sS 'http://localhost:5000/api/v1/locations?q=Seattle&limit=20'
-curl -sS 'http://localhost:5000/api/v1/locations?q=Washington&limit=20'
+
+# Country -> state -> city
+curl -sS 'http://localhost:5000/api/v1/locations?country=United%20States&state=Texas&city=Malakoff'
+
+# All locations in Texas
+curl -sS 'http://localhost:5000/api/v1/locations?region=TX&country=United%20States&limit=500'
+
+# Browse locations in a country
+curl -sS 'http://localhost:5000/api/v1/locations?country=Afghanistan&limit=500'
 ```
 
 Response shape:
@@ -58,6 +73,9 @@ Response shape:
       "display_name": "Seattle, WA",
       "name": "Seattle",
       "region": "WA",
+      "country": "United States",
+      "state": "Washington",
+      "city": "Seattle",
       "latitude": 47.6062,
       "longitude": -122.3321
     }
@@ -65,7 +83,7 @@ Response shape:
 }
 ```
 
-The returned number of rows depends on the bundled dataset and search query.
+The legacy `region` field is retained for compatibility: in US records it contains the state abbreviation, while in international records it contains the original country suffix. Use the explicit `country`, `state`, and `city` fields for unambiguous filtering. State names are normalized from the bundled US state lookup. The current source dataset does not contain continent or global administrative-region metadata, so those values are not fabricated. Existing PostgreSQL rows are backfilled on startup without dropping location data.
 
 ## Current weather
 
