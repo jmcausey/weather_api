@@ -98,8 +98,14 @@ def health():
 @api.get("/locations")
 def locations():
     query = request.args.get("q", "").strip()
+    region = request.args.get("region", "").strip() or None
+    country = request.args.get("country", "").strip() or None
+    state = request.args.get("state", "").strip() or None
+    city = request.args.get("city", "").strip() or None
     limit = min(max(request.args.get("limit", 50, type=int), 1), 500)
-    rows = search_locations(query, limit)
+    rows = search_locations(
+        query, limit, region=region, country=country, state=state, city=city
+    )
     return iso_jsonify({"count": len(rows), "items": rows})
 
 
