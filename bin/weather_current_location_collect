@@ -1,0 +1,10 @@
+#!/bin/sh
+
+curl -sS -X POST "$API_V1/weather/collect" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"location\": \"$CURRENT_LOCATION\",
+    \"latitude\": $LAT,
+    \"longitude\": $LON
+  }" | jq
+

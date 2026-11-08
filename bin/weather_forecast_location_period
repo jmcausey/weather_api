@@ -1,0 +1,17 @@
+#!/bin/sh
+
+curl -sS -G "$API_V1/forecast" \
+  --data-urlencode "location=$CURRENT_LOCATION" |
+jq '.points[] | {
+  time,
+  valid_at,
+  temperature,
+  feels_like,
+  humidity,
+  wind_speed,
+  wind_direction,
+  precipitation_probability,
+  precipitation,
+  description
+}'
+

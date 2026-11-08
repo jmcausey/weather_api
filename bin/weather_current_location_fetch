@@ -1,0 +1,6 @@
+#!/bin/sh
+
+curl -sS -G "$API_V1/history" \
+     --data-urlencode "location=$LOCATION" \
+     --data-urlencode "limit=50" | jq
+

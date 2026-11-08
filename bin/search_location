@@ -1,0 +1,3 @@
+#!/bin/sh
+
+curl -sS "$API_V1/locations?q={$1}" | jq

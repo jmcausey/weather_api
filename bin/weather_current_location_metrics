@@ -1,0 +1,18 @@
+#!/bin/sh
+
+curl -sS -G "$API_V1/weather" \
+  --data-urlencode "location=$CURRENT_LOCATION" |
+jq '{
+  location,
+  temperature,
+  feels_like,
+  humidity,
+  pressure,
+  wind_speed,
+  wind_direction,
+  clouds,
+  description,
+  sunrise,
+  sunset
+}'
+
